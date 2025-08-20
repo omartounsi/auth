@@ -3,7 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { Session } from "next-auth";
 import { JWT } from "next-auth/jwt";
 
-// --- Type extensions ---
+// --- type workaround ---
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
