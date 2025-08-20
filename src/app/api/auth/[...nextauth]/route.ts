@@ -128,7 +128,6 @@ async function handleRefresh(token: JWT) {
       };
     }
 
-    // PHASE 2: Refresh token is null AND access token expires in ≤5 seconds
     if (
       token.refreshToken === null &&
       token.accessToken &&
@@ -169,17 +168,17 @@ async function handleRefresh(token: JWT) {
           error: undefined,
         };
       } else {
-        // Access token still has more than 5 seconds left, don't refresh yet
+        //don't refresh yet
         console.log(
           `access token expires in ${Math.round(
             timeUntilExpiry / 1000
           )}s, waiting for 5s threshold`
         );
-        return token; // Return unchanged token
+        return token; //  unchanged token
       }
     }
 
-    // No valid tokens available
+    // no valid tokens available
     throw new Error("No valid tokens available for refresh");
   } catch (error) {
     console.error(" Cascade refresh failed:", error);
