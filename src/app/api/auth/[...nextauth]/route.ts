@@ -94,15 +94,15 @@ const authOptions: AuthOptions = {
         return token;
       }
 
-      //check if previous token has expired OR is about to expire (10s buffer)
+      //check if previous token has expired OR is about to expire (30s buffer)
       if (
         token.accessTokenExpires &&
-        Date.now() < token.accessTokenExpires - 10000
+        Date.now() < token.accessTokenExpires - 30000
       ) {
         return token;
       }
 
-      //else run refresh function (token expired or expires within 10s)
+      //else run refresh function (token expired or expires within 30s)
       return handleRefresh(token);
     },
     async session({ session, token }: { session: Session; token: JWT }) {
@@ -152,7 +152,12 @@ async function handleRefresh(token: JWT) {
     ) {
       const timeUntilExpiry = token.accessTokenExpires - Date.now();
 
-      if (timeUntilExpiry <= 10000) {
+      // Use 30 second buffer and check if token is still valid for refresh
+      if (timeUntilExpiry <= 30000) {
+        if (timeUntilExpiry < 5000) {
+          throw new Error("Token expired");
+        }
+
         const res = await fetch(process.env.NEXT_PUBLIC_API_URL + "/refresh", {
           method: "GET",
           headers: {
@@ -162,7 +167,7 @@ async function handleRefresh(token: JWT) {
         });
 
         if (!res.ok) {
-          throw new Error("failed to refresh token");
+          throw new Error("Failed to refresh token");
         }
 
         const refreshed = await res.json();
