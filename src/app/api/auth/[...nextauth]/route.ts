@@ -94,7 +94,7 @@ const authOptions: AuthOptions = {
         return token;
       }
 
-      //check if previous token has expired OR is about to expire (10s buffer for 60s tokens)
+      //check if previous token has expired OR is about to expire (10s buffer)
       if (
         token.accessTokenExpires &&
         Date.now() < token.accessTokenExpires - 10000
@@ -166,7 +166,7 @@ async function handleRefresh(token: JWT) {
         }
 
         const refreshed = await res.json();
-        console.log("API refresh response:", refreshed);
+        console.log("API response:", refreshed);
 
         const authData = refreshed.data.authorisation;
 
