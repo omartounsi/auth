@@ -73,6 +73,12 @@ const authOptions: AuthOptions = {
   ],
   session: {
     strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  events: {
+    async signIn({ user, account, profile }) {
+      console.log("User signed in:", user.email);
+    },
   },
   callbacks: {
     async jwt({ token, user }: { token: JWT; user?: User }) {
@@ -88,12 +94,15 @@ const authOptions: AuthOptions = {
         return token;
       }
 
-      //check if previous token has expired
-      if (token.accessTokenExpires && Date.now() < token.accessTokenExpires) {
+      //check if previous token has expired OR is about to expire (10s buffer for 60s tokens)
+      if (
+        token.accessTokenExpires &&
+        Date.now() < token.accessTokenExpires - 10000
+      ) {
         return token;
       }
 
-      //else run refresh function
+      //else run refresh function (token expired or expires within 10s)
       return handleRefresh(token);
     },
     async session({ session, token }: { session: Session; token: JWT }) {
@@ -119,11 +128,19 @@ const authOptions: AuthOptions = {
 async function handleRefresh(token: JWT) {
   try {
     if (token.refreshToken) {
+      // copy refresh token to access use remaining time from refresh token
+      const refreshExpiry =
+        token.refreshTokenExpires || Date.now() + 180 * 1000; //or 3mins
+
+      if (refreshExpiry <= Date.now()) {
+        throw new Error("tokens expired");
+      }
+
       return {
         ...token,
         accessToken: token.refreshToken,
         refreshToken: null,
-        accessTokenExpires: Date.now() + 300 * 1000,
+        accessTokenExpires: refreshExpiry,
         error: undefined,
       };
     }
@@ -135,16 +152,9 @@ async function handleRefresh(token: JWT) {
     ) {
       const timeUntilExpiry = token.accessTokenExpires - Date.now();
 
-      // 5 second timer
-      if (timeUntilExpiry <= 5000) {
-        console.log(
-          `access token expires in ${Math.round(
-            timeUntilExpiry / 1000
-          )}s, calling  /refresh `
-        );
-
+      if (timeUntilExpiry <= 10000) {
         const res = await fetch(process.env.NEXT_PUBLIC_API_URL + "/refresh", {
-          method: "POST",
+          method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token.accessToken}`,
@@ -156,32 +166,27 @@ async function handleRefresh(token: JWT) {
         }
 
         const refreshed = await res.json();
-        console.log("tokens refreshed");
+        console.log("API refresh response:", refreshed);
+
+        const authData = refreshed.data.authorisation;
 
         return {
           ...token,
-          accessToken: refreshed.access_token,
-          refreshToken: refreshed.refresh_token,
-          accessTokenExpires: Date.now() + refreshed.access_token_expire * 1000,
+          accessToken: authData.access_token,
+          refreshToken: authData.refresh_token,
+          accessTokenExpires: Date.now() + authData.access_token_expire * 1000,
           refreshTokenExpires:
-            Date.now() + refreshed.refresh_token_expire * 1000,
+            Date.now() + authData.refresh_token_expire * 1000,
           error: undefined,
         };
       } else {
-        //don't refresh yet
-        console.log(
-          `access token expires in ${Math.round(
-            timeUntilExpiry / 1000
-          )}s, waiting for 5s threshold`
-        );
-        return token; //  unchanged token
+        return token;
       }
     }
 
-    // no valid tokens available
-    throw new Error("No valid tokens available for refresh");
+    throw new Error("no valid tokens available for refresh");
   } catch (error) {
-    console.error(" Cascade refresh failed:", error);
+    console.error("Refresh failed:", error);
     return {
       ...token,
       error: "RefreshAccessTokenError",
