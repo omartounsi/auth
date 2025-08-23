@@ -14,6 +14,13 @@ declare module "next-auth" {
       name?: string;
     };
   }
+
+  interface User {
+    accessToken: string;
+    refreshToken: string;
+    accessTokenExpires: number;
+    refreshTokenExpires: number;
+  }
 }
 
 declare module "next-auth/jwt" {
@@ -84,11 +91,10 @@ const authOptions: AuthOptions = {
     async jwt({ token, user }: { token: JWT; user?: User }) {
       // Initial sign in
       if (user) {
-        const customUser = user as any;
-        token.accessToken = customUser.accessToken;
-        token.refreshToken = customUser.refreshToken;
-        token.accessTokenExpires = customUser.accessTokenExpires;
-        token.refreshTokenExpires = customUser.refreshTokenExpires;
+        token.accessToken = user.accessToken;
+        token.refreshToken = user.refreshToken;
+        token.accessTokenExpires = user.accessTokenExpires;
+        token.refreshTokenExpires = user.refreshTokenExpires;
         token.id = user.id;
         token.email = user.email || "";
         return token;
@@ -152,11 +158,11 @@ async function handleRefresh(token: JWT) {
     ) {
       const timeUntilExpiry = token.accessTokenExpires - Date.now();
 
-      // Use 30 second buffer and check if token is still valid for refresh
+      // 30 second buffer and check if token is still valid for refresh
       if (timeUntilExpiry <= 30000) {
-        if (timeUntilExpiry < 5000) {
-          throw new Error("Token expired");
-        }
+        console.log(
+          `access token expires in ${Math.round(timeUntilExpiry / 1000)}s, `
+        );
 
         const res = await fetch(process.env.NEXT_PUBLIC_API_URL + "/refresh", {
           method: "GET",
